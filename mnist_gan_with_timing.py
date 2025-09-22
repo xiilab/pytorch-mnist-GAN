@@ -58,7 +58,15 @@ class MNISTGANTrainer:
         self.batch_size = batch_size
         self.z_dim = z_dim
         self.lr = lr
-        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # 디바이스 우선순위: CUDA > MPS > CPU
+        if device:
+            self.device = device
+        elif torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+        else:
+            self.device = torch.device('cpu')
         
         # 시간 측정을 위한 변수들
         self.training_times = []
@@ -83,7 +91,7 @@ class MNISTGANTrainer:
         """데이터 로더 설정"""
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+            transforms.Normalize(mean=(0.5,), std=(0.5,))
         ])
         
         train_dataset = datasets.MNIST(root='./mnist_data/', train=True, 
@@ -96,8 +104,11 @@ class MNISTGANTrainer:
         self.test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=self.batch_size, shuffle=False)
         
-        # MNIST 이미지 차원
-        self.mnist_dim = train_dataset.train_data.size(1) * train_dataset.train_data.size(2)
+        # MNIST 이미지 차원 (PyTorch 버전 호환성을 위해 수정)
+        if hasattr(train_dataset, 'data'):
+            self.mnist_dim = train_dataset.data.size(1) * train_dataset.data.size(2)
+        else:
+            self.mnist_dim = train_dataset.train_data.size(1) * train_dataset.train_data.size(2)
         print(f"MNIST 이미지 차원: {self.mnist_dim}")
     
     def _setup_networks(self):
@@ -120,18 +131,21 @@ class MNISTGANTrainer:
         """판별자 훈련"""
         self.D.zero_grad()
         
+        # 현재 배치 크기 (마지막 배치는 다를 수 있음)
+        current_batch_size = x.size(0)
+        
         # 실제 데이터로 훈련
         x_real = x.view(-1, self.mnist_dim)
-        y_real = torch.ones(x_real.size(0), 1)
+        y_real = torch.ones(current_batch_size, 1)
         x_real, y_real = Variable(x_real.to(self.device)), Variable(y_real.to(self.device))
         
         D_output = self.D(x_real)
         D_real_loss = self.criterion(D_output, y_real)
         
         # 가짜 데이터로 훈련
-        z = Variable(torch.randn(x_real.size(0), self.z_dim).to(self.device))
+        z = Variable(torch.randn(current_batch_size, self.z_dim).to(self.device))
         x_fake = self.G(z)
-        y_fake = Variable(torch.zeros(x_real.size(0), 1).to(self.device))
+        y_fake = Variable(torch.zeros(current_batch_size, 1).to(self.device))
         
         D_output = self.D(x_fake)
         D_fake_loss = self.criterion(D_output, y_fake)
