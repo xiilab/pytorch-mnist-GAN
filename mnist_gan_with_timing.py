@@ -58,15 +58,11 @@ class MNISTGANTrainer:
         self.batch_size = batch_size
         self.z_dim = z_dim
         self.lr = lr
-        # 디바이스 우선순위: CUDA > MPS > CPU
+        # 디바이스 우선순위: CUDA > MPS > CPU (안전한 CUDA 감지 포함)
         if device:
             self.device = device
-        elif torch.cuda.is_available():
-            self.device = torch.device('cuda')
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            self.device = torch.device('mps')
         else:
-            self.device = torch.device('cpu')
+            self.device = self._get_safe_device()
         
         # 시간 측정을 위한 변수들
         self.training_times = []
@@ -86,6 +82,33 @@ class MNISTGANTrainer:
         
         # 샘플 저장 디렉토리 생성
         os.makedirs('./samples', exist_ok=True)
+    
+    def _get_safe_device(self):
+        """안전한 디바이스 감지 및 설정"""
+        try:
+            # CUDA 사용 가능성 확인 및 실제 테스트
+            if torch.cuda.is_available():
+                # 간단한 텐서 연산으로 CUDA 실제 사용 가능성 테스트
+                test_tensor = torch.tensor([1.0]).cuda()
+                _ = test_tensor + 1
+                print(f"주인님, CUDA 디바이스 사용 가능: {torch.cuda.get_device_name()}")
+                return torch.device('cuda')
+        except Exception as e:
+            print(f"CUDA 사용 중 오류 발생, CPU로 전환: {e}")
+        
+        try:
+            # MPS (Apple Silicon) 확인
+            if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                test_tensor = torch.tensor([1.0]).to('mps')
+                _ = test_tensor + 1
+                print("주인님, MPS 디바이스 사용 가능 (Apple Silicon)")
+                return torch.device('mps')
+        except Exception as e:
+            print(f"MPS 사용 중 오류 발생, CPU로 전환: {e}")
+        
+        # 기본값: CPU
+        print("주인님, CPU 디바이스 사용")
+        return torch.device('cpu')
     
     def _setup_data_loaders(self):
         """데이터 로더 설정"""
@@ -254,11 +277,15 @@ def main():
     
     print(f"설정: {config}")
     
+    # CUDA 오류 방지를 위한 CPU 강제 모드 (필요시 주석 해제)
+    # force_cpu = torch.device('cpu')
+    
     # 트레이너 초기화 및 훈련 시작
     trainer = MNISTGANTrainer(
         batch_size=config['batch_size'],
         z_dim=config['z_dim'],
         lr=config['lr']
+        # device=force_cpu  # CUDA 문제 시 주석 해제
     )
     
     trainer.train(
