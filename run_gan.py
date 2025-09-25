@@ -7,6 +7,10 @@
 from mnist_gan_with_timing import MNISTGANTrainer
 import torch
 
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['TORCH_USE_CUDA_DSA'] = '1'
+
 def quick_test():
     """빠른 테스트 실행 (10 에포크)"""
     print("주인님, 빠른 테스트를 시작합니다! (10 에포크)")
