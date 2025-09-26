@@ -14,6 +14,7 @@ from torchvision.utils import save_image
 import time
 import os
 from datetime import datetime
+import tempfile
 
 
 class Generator(nn.Module):
@@ -109,6 +110,47 @@ class MNISTGANTrainer:
         # 기본값: CPU
         print("주인님, CPU 디바이스 사용")
         return torch.device('cpu')
+    
+    def measure_disk_performance(self):
+        """디스크 I/O 성능 측정"""
+        print(f"\n💿 디스크 I/O 성능 측정:")
+        
+        # 간단한 디스크 속도 테스트
+        test_file_size = 100 * 1024 * 1024  # 100MB
+        test_data = b'0' * (1024 * 1024)  # 1MB 청크
+        
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_path = tmp_file.name
+                
+                # 쓰기 속도 측정
+                start_time = time.time()
+                for _ in range(100):  # 100MB 쓰기
+                    tmp_file.write(test_data)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())  # 강제로 디스크에 쓰기
+                write_time = time.time() - start_time
+                write_speed = test_file_size / write_time / (1024**2)  # MB/s
+                
+            # 읽기 속도 측정
+            start_time = time.time()
+            with open(tmp_path, 'rb') as f:
+                while f.read(1024 * 1024):  # 1MB씩 읽기
+                    pass
+            read_time = time.time() - start_time
+            read_speed = test_file_size / read_time / (1024**2)  # MB/s
+            
+            print(f"   - 순차 쓰기 속도: {write_speed:.1f} MB/s")
+            print(f"   - 순차 읽기 속도: {read_speed:.1f} MB/s")
+            
+            # 임시 파일 삭제
+            os.unlink(tmp_path)
+            
+            return {'write_speed': write_speed, 'read_speed': read_speed}
+            
+        except Exception as e:
+            print(f"   - 디스크 속도 측정 실패: {e}")
+            return {'write_speed': 0, 'read_speed': 0}
     
     def _setup_data_loaders(self):
         """데이터 로더 설정"""
