@@ -21,9 +21,6 @@ def quick_test():
         lr=0.0002
     )
     
-    # 디스크 성능 측정
-    trainer.measure_disk_performance()
-    
     trainer.train(n_epochs=10, save_interval=5)
     print("빠른 테스트 완료!")
 

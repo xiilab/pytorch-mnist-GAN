@@ -83,6 +83,9 @@ class MNISTGANTrainer:
         
         # 샘플 저장 디렉토리 생성
         os.makedirs('./samples', exist_ok=True)
+        
+        # 디스크 성능 측정 (한 번만 실행)
+        self.disk_performance = self.measure_disk_performance()
     
     def _get_safe_device(self):
         """안전한 디바이스 감지 및 설정"""
