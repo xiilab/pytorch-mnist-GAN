@@ -37,6 +37,9 @@ def full_training():
         lr=0.0002
     )
     
+    # 디스크 성능 측정
+    trainer.measure_disk_performance()
+    
     trainer.train(n_epochs=200, save_interval=50)
     print("전체 훈련 완료!")
 
